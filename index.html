@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Treino ABC">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Treino ABC</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#111827;--good:#166534}
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+header{position:sticky;top:0;z-index:5;background:rgba(244,245,247,.94);backdrop-filter:blur(12px);padding:calc(12px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line)}
+header h1{font-size:21px;margin:0} header small{color:var(--muted)}
+main{max-width:720px;margin:auto;padding:16px 14px 110px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px #00000008}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between}.muted{color:var(--muted);font-size:13px}.big{font-size:24px;font-weight:750}
+button{border:0;border-radius:13px;padding:12px 14px;font-weight:700;font-size:15px;background:var(--accent);color:white}button.secondary{background:#eef0f3;color:var(--ink)}button.danger{background:#fee2e2;color:#991b1b}
+.tabs{position:fixed;bottom:0;left:0;right:0;z-index:10;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+.tabs button{background:white;color:var(--muted);width:25%;max-width:180px;padding:9px 2px;font-size:12px}.tabs button.active{color:var(--ink)}
+.exercise h3{margin:0 0 4px;font-size:17px}.sets{display:grid;grid-template-columns:42px 1fr 1fr 44px;gap:7px;margin-top:12px;align-items:center}.sets .head{font-size:11px;color:var(--muted);text-align:center}
+input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 5px;font-size:16px;text-align:center;background:white}
+.check{width:42px;height:42px;padding:0;background:#eef0f3;color:#6b7280}.check.done{background:#dcfce7;color:var(--good)}
+.badge{display:inline-block;background:#eef0f3;border-radius:99px;padding:5px 8px;font-size:12px;margin:4px 4px 0 0}.progress{color:var(--good);font-weight:700;font-size:13px;margin-top:8px}
+.workoutTitle{margin-bottom:4px}.spacer{height:5px}.hidden{display:none}
+.historyItem{padding:11px 0;border-bottom:1px solid var(--line)}.historyItem:last-child{border:0}
+.timer{position:fixed;right:14px;bottom:82px;background:#111827;color:white;padding:10px 14px;border-radius:99px;font-weight:800;box-shadow:0 4px 18px #0003}
+textarea{width:100%;min-height:85px;border:1px solid var(--line);border-radius:12px;padding:10px}
+</style>
+</head>
+<body>
+<header><h1>Treino ABC</h1><small id="headerSub">Hipertrofia • progresso local</small></header>
+<main id="app"></main>
+<div id="timer" class="timer hidden"></div>
+<nav class="tabs">
+<button data-tab="home" class="active">Início</button><button data-tab="train">Treinar</button><button data-tab="history">Histórico</button><button data-tab="settings">Dados</button>
+</nav>
+<script>
+const PROGRAM={
+A:{name:"Peito + ombros + tríceps",ex:[
+["Supino reto",4,"6–8"],["Supino inclinado com halteres",3,"8–10"],["Peck deck",3,"8–10"],["Desenvolvimento de ombros",3,"6–10"],["Elevação lateral",3,"8–10"],["Tríceps corda",3,"8–10"]]},
+B:{name:"Costas + bíceps + panturrilha",ex:[
+["Puxada alta aberta pronada",3,"6–10"],["Remada baixa no triângulo",3,"6–10"],["Puxada alta supinada",3,"8–10"],["Peck deck invertido",3,"8–10"],["Rosca direta barra W",3,"6–10"],["Panturrilha em pé",5,"8–10"]]},
+C:{name:"Pernas + panturrilha",ex:[
+["Agachamento no Smith",4,"6–8"],["Leg press 45°",4,"8–10"],["Stiff",3,"6–10"],["Cadeira extensora",3,"8–10"],["Cadeira flexora",3,"8–10"],["Panturrilha no leg press",5,"8–12"]]}
+};
+const KEY="treinoABC_v1";
+let db=JSON.parse(localStorage.getItem(KEY)||'{"history":[],"active":null}');
+let tab="home", timerEnd=0, timerInt=null;
+const save=()=>localStorage.setItem(KEY,JSON.stringify(db));
+function lastExercise(name){
+ for(let i=db.history.length-1;i>=0;i--){let e=db.history[i].exercises.find(x=>x.name===name);if(e)return e} return null;
+}
+function parseTop(r){let m=r.match(/(\d+)$/);return m?+m[1]:10}
+function home(){
+ let counts={A:0,B:0,C:0};db.history.forEach(x=>counts[x.type]=(counts[x.type]||0)+1);
+ let last=db.history.at(-1);
+ return `<div class="card"><div class="muted">TREINOS CONCLUÍDOS</div><div class="big">${db.history.length}</div>${last?`<div class="muted">Último: ${last.type} • ${new Date(last.finished).toLocaleDateString("pt-BR")}</div>`:"<div class=muted>Nenhum treino registrado ainda</div>"}</div>
+ ${Object.entries(PROGRAM).map(([k,w])=>`<div class="card"><div class=row><div><div class=big>${k}</div><b>${w.name}</b><div class=muted>${w.ex.length} exercícios • concluído ${counts[k]}x</div></div><button onclick="start('${k}')">Iniciar</button></div></div>`).join("")}`;
+}
+function start(type){
+ if(db.active && !confirm("Há um treino em andamento. Substituir?"))return;
+ db.active={type,started:Date.now(),exercises:PROGRAM[type].ex.map(([name,n,range])=>({name,range,sets:Array.from({length:n},()=>({kg:"",reps:"",done:false}))}))};save();tab="train";render();
+}
+function train(){
+ if(!db.active)return `<div class=card><b>Nenhum treino em andamento.</b><p class=muted>Escolha A, B ou C na tela inicial.</p></div>`;
+ let a=db.active;
+ return `<div class=card><div class=row><div><div class=muted>TREINO ${a.type}</div><h2 class=workoutTitle>${PROGRAM[a.type].name}</h2><div class=muted>Iniciado ${new Date(a.started).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div></div><button onclick=finish()>Finalizar</button></div></div>
+ ${a.exercises.map((e,ei)=>exerciseHTML(e,ei)).join("")}`;
+}
+function exerciseHTML(e,ei){
+ let last=lastExercise(e.name), lastText=last?last.sets.map(s=>`${s.kg||"–"}kg×${s.reps||"–"}`).join(" · "):"sem histórico";
+ let all=e.sets.every(s=>s.done), top=parseTop(e.range), canUp=all&&e.sets.every(s=>+s.reps>=top);
+ return `<div class="card exercise"><h3>${e.name}</h3><span class=badge>${e.sets.length} séries</span><span class=badge>${e.range} reps</span><div class=muted style="margin-top:7px">Última vez: ${lastText}</div>${canUp?`<div class=progress>↑ Você bateu o topo da faixa. Considere aumentar a carga na próxima.</div>`:""}
+ <div class=sets><div></div><div class=head>KG</div><div class=head>REPS</div><div></div>
+ ${e.sets.map((s,si)=>`<div class=muted style=text-align:center>${si+1}</div><input inputmode=decimal value="${s.kg}" onchange="upd(${ei},${si},'kg',this.value)"><input inputmode=numeric value="${s.reps}" onchange="upd(${ei},${si},'reps',this.value)"><button class="check ${s.done?"done":""}" onclick="done(${ei},${si})">${s.done?"✓":"○"}</button>`).join("")}</div></div>`;
+}
+function upd(e,s,f,v){db.active.exercises[e].sets[s][f]=v;save()}
+function done(e,s){let x=db.active.exercises[e].sets[s];x.done=!x.done;save();if(x.done)startTimer(90);render()}
+function startTimer(sec){timerEnd=Date.now()+sec*1000;clearInterval(timerInt);timerInt=setInterval(showTimer,250);showTimer()}
+function showTimer(){let el=document.getElementById("timer"), left=Math.ceil((timerEnd-Date.now())/1000);if(left<=0){clearInterval(timerInt);el.classList.add("hidden");return}el.classList.remove("hidden");el.textContent=`Descanso ${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}`}
+function finish(){
+ let a=db.active, total=a.exercises.flatMap(e=>e.sets).length, done=a.exercises.flatMap(e=>e.sets).filter(s=>s.done).length;
+ if(done<total && !confirm(`Você marcou ${done}/${total} séries. Finalizar mesmo assim?`))return;
+ a.finished=Date.now();db.history.push(a);db.active=null;save();tab="history";render();
+}
+function history(){
+ if(!db.history.length)return `<div class=card><b>Seu histórico aparecerá aqui.</b></div>`;
+ return `<div class=card><h2>Histórico</h2>${[...db.history].reverse().map(w=>`<div class=historyItem><b>Treino ${w.type} — ${PROGRAM[w.type].name}</b><div class=muted>${new Date(w.finished).toLocaleString("pt-BR")} • ${Math.round((w.finished-w.started)/60000)} min</div></div>`).join("")}</div>`;
+}
+function settings(){
+ return `<div class=card><h2>Backup</h2><p class=muted>O progresso é salvo automaticamente neste navegador. Exporte um backup de vez em quando, principalmente antes de trocar de celular ou limpar dados do Safari.</p><div class=row><button onclick=exportData()>Exportar backup</button><button class=secondary onclick=document.getElementById('imp').click()>Importar</button></div><input id=imp class=hidden type=file accept=".json,application/json" onchange=importData(this.files[0])></div>
+ <div class=card><h3>Dados locais</h3><p class=muted>${db.history.length} treinos concluídos.</p><button class=danger onclick=wipe()>Apagar tudo</button></div>`;
+}
+function exportData(){let b=new Blob([JSON.stringify(db,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="treino-backup.json";a.click();URL.revokeObjectURL(a.href)}
+function importData(f){let r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);save();alert("Backup importado.");render()}catch{alert("Arquivo inválido.")}};r.readAsText(f)}
+function wipe(){if(confirm("Apagar todo o histórico e treino atual?")){db={history:[],active:null};save();render()}}
+function render(){document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.getElementById("app").innerHTML=tab==="home"?home():tab==="train"?train():tab==="history"?history():settings()}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});render();
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
+}
+</script>
+</body></html>
